@@ -1,26 +1,31 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-const FIGURES = [
-  "Дастин", "Дастин из изнанки",
-  "Майк",
-  "Уилл", "Уилл из изнанки",
-  "Лукас",
-  "Макс",
-  "Оди из лаборатории",
-  "Оди из изнанки",
-  "Оди в лабораторном халате",
-  "Демогргон на карандаш",
-  "Демогоргон-брелок", "Демогоргон-брелок на скрепке",
-  "Стив", "Стив из изнанки",
-  "Векна",
-  "Эрика",
-  "Хоппер", "Хоппер из изнанки",
-  "Нэнси",
-  "Робин из изнанки",
-  "Эдди из изнанки",
-  "Макс из изнанки",
-  "Связанные Стив и Робин"
+const FIGURES: { name: string; imageUrl: string }[] = [
+  { name: "Дастин", imageUrl: "https://i.ibb.co/6RQJ3Dn/dustin.png" },
+  { name: "Дастин из изнанки", imageUrl: "https://i.ibb.co/7vMQgKN/dustin-upside.png" },
+  { name: "Майк", imageUrl: "https://i.ibb.co/3fLqKpR/mike.png" },
+  { name: "Уилл", imageUrl: "https://i.ibb.co/Qf9Ld4M/will.png" },
+  { name: "Уилл из изнанки", imageUrl: "https://i.ibb.co/Wk4sJRN/will-upside.png" },
+  { name: "Лукас", imageUrl: "https://i.ibb.co/xMsRb3Y/lucas.png" },
+  { name: "Макс", imageUrl: "https://i.ibb.co/1nKJ2Rq/max.png" },
+  { name: "Оди из лаборатории", imageUrl: "https://i.ibb.co/fQkLqMv/eleven-lab.png" },
+  { name: "Оди из изнанки", imageUrl: "https://i.ibb.co/9wZGhQf/eleven-upside.png" },
+  { name: "Оди в лабораторном халате", imageUrl: "https://i.ibb.co/r7RqXPL/eleven-coat.png" },
+  { name: "Демогргон на карандаш", imageUrl: "https://i.ibb.co/CwPQhZ6/demogorgon-pencil.png" },
+  { name: "Демогоргон-брелок", imageUrl: "https://i.ibb.co/Hd3v4JN/demogorgon-keychain.png" },
+  { name: "Демогоргон-брелок на скрепке", imageUrl: "https://i.ibb.co/vXJ5YLs/demogorgon-clip.png" },
+  { name: "Стив", imageUrl: "https://i.ibb.co/LRy9c7K/steve.png" },
+  { name: "Стив из изнанки", imageUrl: "https://i.ibb.co/6RJmVhL/steve-upside.png" },
+  { name: "Векна", imageUrl: "https://i.ibb.co/q5RLqNm/vecna.png" },
+  { name: "Эрика", imageUrl: "https://i.ibb.co/Lz8y4Rn/erica.png" },
+  { name: "Хоппер", imageUrl: "https://i.ibb.co/1QVqZ7G/hopper.png" },
+  { name: "Хоппер из изнанки", imageUrl: "https://i.ibb.co/2yPGdLk/hopper-upside.png" },
+  { name: "Нэнси", imageUrl: "https://i.ibb.co/X8LzNhR/nancy.png" },
+  { name: "Робин из изнанки", imageUrl: "https://i.ibb.co/fH9qYZv/robin-upside.png" },
+  { name: "Эдди из изнанки", imageUrl: "https://i.ibb.co/VvXLq1N/eddie-upside.png" },
+  { name: "Макс из изнанки", imageUrl: "https://i.ibb.co/YTQh7Fd/max-upside.png" },
+  { name: "Связанные Стив и Робин", imageUrl: "https://i.ibb.co/3pZLrKq/steve-robin-tied.png" },
 ];
 
 function calculateProbabilities(): number[] {
@@ -31,13 +36,13 @@ function calculateProbabilities(): number[] {
   const pOther = (1 - pWill - pWillDark) / remaining;
   
   return FIGURES.map(f => {
-    if (f === "Уилл") return pWill;
-    if (f === "Уилл из изнанки") return pWillDark;
+    if (f.name === "Уилл") return pWill;
+    if (f.name === "Уилл из изнанки") return pWillDark;
     return pOther;
   });
 }
 
-function weightedRandomChoice(items: string[], weights: number[]): string {
+function weightedRandomChoice(items: { name: string; imageUrl: string }[], weights: number[]): { name: string; imageUrl: string } {
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
   let random = Math.random() * totalWeight;
   
@@ -96,6 +101,7 @@ export const openEggTool = createTool({
     success: z.boolean(),
     message: z.string(),
     figure: z.string().optional(),
+    imageUrl: z.string().optional(),
     collection: z.array(z.object({
       name: z.string(),
       count: z.number(),
@@ -138,10 +144,10 @@ export const openEggTool = createTool({
     const probabilities = calculateProbabilities();
     const figure = weightedRandomChoice(FIGURES, probabilities);
     
-    gameState.collection.push(figure);
+    gameState.collection.push(figure.name);
     userGameState.set(context.userName, gameState);
     
-    logger?.info("✅ [openEggTool] Egg opened, got figure:", figure);
+    logger?.info("✅ [openEggTool] Egg opened, got figure:", figure.name);
     
     const collectionCount: Record<string, number> = {};
     for (const item of gameState.collection) {
@@ -152,7 +158,7 @@ export const openEggTool = createTool({
     
     const collectionText = collection.map(c => `${c.name}: ${c.count}`).join("\n");
     
-    let message = `🥚 Ты открыл яйцо №${context.eggNumber}!\n\n🎁 Тебе выпала: *${figure}*!\n\n📦 *Твоя коллекция:*\n${collectionText}`;
+    let message = `🥚 Ты открыл яйцо №${context.eggNumber}!\n\n🎁 Тебе выпала: *${figure.name}*!\n\n📦 *Твоя коллекция:*\n${collectionText}`;
     
     if (gameState.eggs.length === 0) {
       message += "\n\n🎉 Поздравляю! Ты открыл все яйца! Напиши /start чтобы начать заново.";
@@ -163,7 +169,8 @@ export const openEggTool = createTool({
     return {
       success: true,
       message,
-      figure,
+      figure: figure.name,
+      imageUrl: figure.imageUrl,
       collection,
       remainingEggs: gameState.eggs.length,
     };

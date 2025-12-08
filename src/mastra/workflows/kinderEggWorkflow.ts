@@ -73,6 +73,63 @@ const sendToTelegram = createStep({
     }
 
     try {
+      let textMessage = inputData.agentResponse;
+      let imageUrl: string | null = null;
+      
+      const imageMatch = inputData.agentResponse.match(/\[IMAGE:(.*?)\]/);
+      if (imageMatch) {
+        imageUrl = imageMatch[1];
+        textMessage = inputData.agentResponse.replace(/\[IMAGE:.*?\]/, "").trim();
+      }
+      
+      if (imageUrl) {
+        logger?.info("📷 [Step 2] Sending photo to Telegram...", { imageUrl });
+        const photoResponse = await fetch(
+          `https://api.telegram.org/bot${token}/sendPhoto`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: inputData.chatId,
+              photo: imageUrl,
+              caption: textMessage,
+              parse_mode: "Markdown",
+            }),
+          }
+        );
+        
+        const photoResult = await photoResponse.json();
+        
+        if (!photoResult.ok) {
+          logger?.warn("⚠️ [Step 2] Photo send failed, falling back to text:", photoResult);
+          const textResponse = await fetch(
+            `https://api.telegram.org/bot${token}/sendMessage`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: inputData.chatId,
+                text: textMessage,
+                parse_mode: "Markdown",
+              }),
+            }
+          );
+          const textResult = await textResponse.json();
+          if (!textResult.ok) {
+            return {
+              success: false,
+              message: `Telegram error: ${textResult.description}`,
+            };
+          }
+        }
+        
+        logger?.info("✅ [Step 2] Photo sent to Telegram successfully");
+        return {
+          success: true,
+          message: "Photo sent successfully",
+        };
+      }
+      
       const response = await fetch(
         `https://api.telegram.org/bot${token}/sendMessage`,
         {
@@ -80,7 +137,7 @@ const sendToTelegram = createStep({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: inputData.chatId,
-            text: inputData.agentResponse,
+            text: textMessage,
             parse_mode: "Markdown",
           }),
         }
@@ -97,7 +154,7 @@ const sendToTelegram = createStep({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id: inputData.chatId,
-              text: inputData.agentResponse,
+              text: textMessage,
             }),
           }
         );

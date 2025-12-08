@@ -5,8 +5,8 @@ import { startGameTool, openEggTool, getCollectionTool } from "../tools/eggColle
 import { createOpenAI } from "@ai-sdk/openai";
 
 const openai = createOpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL || undefined,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export const kinderEggAgent = new Agent({
@@ -32,6 +32,7 @@ export const kinderEggAgent = new Agent({
     - Будь дружелюбным и весёлым
     - Используй эмодзи для создания атмосферы
     - Возвращай ТОЛЬКО текст сообщения из инструмента (поле message)
+    - Если инструмент вернул imageUrl, ОБЯЗАТЕЛЬНО добавь его в конец ответа в формате: [IMAGE:url]
     - НЕ добавляй лишнего текста к сообщениям от инструментов
   `,
 
