@@ -1,0 +1,101 @@
+import random
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+
+TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_HERE"
+
+# ————— СПИСОК ФИГУРОК —————
+FIGURES = [
+    "Дастин", "Дастин из изнанки",
+    "Майк",
+    "Уилл", "Уилл из изнанки",
+    "Лукас",
+    "Макс",
+    "Оди из лаборатории",
+    "Оди из изнанки",
+    "Оди в лабораторном халате",
+    "Демогргон на карандаш",
+    "Демогоргон-брелок", "Демогоргон-брелок на скрепке",
+    "Стив", "Стив из изнанки",
+    "Векна",
+    "Эрика",
+    "Хоппер", "Хоппер из изнанки",
+    "Нэнси",
+    "Робин из изнанки",
+    "Эдди из изнанки",
+    "Макс из изнанки",
+    "Связанные Стив и Робин"
+]
+
+PROBABILITIES = None  # вычислим позже
+
+# ————— START —————
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["eggs"] = list(range(1, 25))
+    context.user_data["collection"] = []
+
+    await update.message.reply_photo(
+        photo="https://i.ibb.co/PmFQh0V/kinder-eggs-24.png",
+        caption="Выбери яйцо: напиши число от 1 до 24."
+    )
+
+# ————— ОТКРЫТИЕ ЯЙЦА —————
+async def open_egg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if not text.isdigit():
+        await update.message.reply_text("Введи число от 1 до 24!")
+        return
+
+    egg = int(text)
+
+    if egg not in context.user_data.get("eggs", []):
+        await update.message.reply_text("Это яйцо уже открыто. Выбери другое!")
+        return
+
+    # Удаляем яйцо
+    context.user_data["eggs"].remove(egg)
+
+    # — Вероятности —
+    global PROBABILITIES
+    if PROBABILITIES is None:
+        total = len(FIGURES)
+        p_will = 0.005
+        p_will_dark = 0.01
+        remaining = total - 2
+        p_other = (1 - p_will - p_will_dark) / remaining
+        PROBABILITIES = []
+        for f in FIGURES:
+            if f == "Уилл": PROBABILITIES.append(p_will)
+            elif f == "Уилл из изнанки": PROBABILITIES.append(p_will_dark)
+            else: PROBABILITIES.append(p_other)
+
+    # — Выпавшая фигурка —
+    figure = random.choices(FIGURES, weights=PROBABILITIES, k=1)[0]
+
+    # Сохраняем в коллекцию
+    context.user_data["collection"].append(figure)
+
+    await update.message.reply_text(f"🥚 Ты открыл яйцо №{egg}!")
+    await update.message.reply_text(f"🎁 Тебе выпала: *{figure}*!",
+                                    parse_mode="Markdown")
+
+    # — Показываем коллекцию —
+    unique = {}
+    for item in context.user_data["collection"]:
+        unique[item] = unique.get(item, 0) + 1
+
+    text = "\n".join([f"{name}: {count}" for name, count in unique.items()])
+    await update.message.reply_text(f"📦 *Твоя коллекция:* \n{text}",
+                                    parse_mode="Markdown")
+
+
+async def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, open_egg))
+    await app.run_polling()
+
+
+import asyncio
+asyncio.run(main())
