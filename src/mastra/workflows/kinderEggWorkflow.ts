@@ -82,6 +82,14 @@ const sendToTelegram = createStep({
         textMessage = inputData.agentResponse.replace(/\[IMAGE:.*?\]/, "").trim();
       }
       
+      if (!imageUrl) {
+        const markdownMatch = inputData.agentResponse.match(/!\[.*?\]\((https?:\/\/[^\)]+)\)/);
+        if (markdownMatch) {
+          imageUrl = markdownMatch[1];
+          textMessage = inputData.agentResponse.replace(/!\[.*?\]\(https?:\/\/[^\)]+\)/, "").trim();
+        }
+      }
+      
       if (imageUrl) {
         logger?.info("📷 [Step 2] Sending photo to Telegram...", { imageUrl });
         const photoResponse = await fetch(

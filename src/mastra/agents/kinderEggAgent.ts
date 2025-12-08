@@ -2,11 +2,10 @@ import { Agent } from "@mastra/core/agent";
 import { Memory } from "@mastra/memory";
 import { sharedPostgresStorage } from "../storage";
 import { startGameTool, openEggTool, getCollectionTool } from "../tools/eggCollectionTool";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
-const openai = createOpenAI({
-  baseURL: process.env.OPENAI_BASE_URL || undefined,
-  apiKey: process.env.OPENAI_API_KEY,
+const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY,
 });
 
 export const kinderEggAgent = new Agent({
@@ -32,11 +31,12 @@ export const kinderEggAgent = new Agent({
     - Будь дружелюбным и весёлым
     - Используй эмодзи для создания атмосферы
     - Возвращай ТОЛЬКО текст сообщения из инструмента (поле message)
-    - Если инструмент вернул imageUrl, ОБЯЗАТЕЛЬНО добавь его в конец ответа в формате: [IMAGE:url]
+    - Если инструмент вернул imageUrl, ОБЯЗАТЕЛЬНО добавь его в САМЫЙ КОНЕЦ ответа ТОЧНО в таком формате: [IMAGE:ссылка] (например: [IMAGE:https://example.com/image.png])
+    - НЕ используй Markdown формат для картинок (НЕ пиши ![](url))
     - НЕ добавляй лишнего текста к сообщениям от инструментов
   `,
 
-  model: openai.responses("gpt-4o"),
+  model: openrouter("openai/gpt-4o-mini"),
 
   tools: { startGameTool, openEggTool, getCollectionTool },
 
