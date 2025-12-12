@@ -11,6 +11,54 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
   );
 }
 
+async function setupTelegramWebhook() {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    console.warn("⚠️ [Telegram] No bot token, skipping webhook setup");
+    return;
+  }
+
+  let webhookUrl: string | undefined;
+  
+  if (process.env.REPLIT_DOMAINS) {
+    const domain = process.env.REPLIT_DOMAINS.split(",")[0];
+    webhookUrl = `https://${domain}/api/webhooks/telegram/action`;
+  } else if (process.env.CONNECTORS_HOSTNAME) {
+    webhookUrl = `https://${process.env.CONNECTORS_HOSTNAME}/api/webhooks/telegram/action`;
+  } else if (process.env.REPLIT_CONNECTORS_HOSTNAME) {
+    webhookUrl = `https://${process.env.REPLIT_CONNECTORS_HOSTNAME}/api/webhooks/telegram/action`;
+  }
+
+  if (!webhookUrl) {
+    console.warn("⚠️ [Telegram] No domain found for webhook setup");
+    return;
+  }
+
+  console.log(`🔗 [Telegram] Setting webhook to: ${webhookUrl}`);
+  
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: webhookUrl,
+        allowed_updates: ["message", "pre_checkout_query"],
+      }),
+    });
+    
+    const result = await response.json();
+    if (result.ok) {
+      console.log("✅ [Telegram] Webhook set successfully");
+    } else {
+      console.error("❌ [Telegram] Failed to set webhook:", result);
+    }
+  } catch (error) {
+    console.error("❌ [Telegram] Error setting webhook:", error);
+  }
+}
+
+setupTelegramWebhook();
+
 export type TriggerInfoTelegramOnNewMessage = {
   type: "telegram/message" | "telegram/pre_checkout" | "telegram/payment";
   params: {
