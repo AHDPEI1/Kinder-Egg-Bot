@@ -1,44 +1,18 @@
 /**
- * Telegram Trigger - Webhook-based Workflow Triggering
- *
- * This module provides Telegram bot event handling for Mastra workflows.
- * When Telegram messages are received, this trigger starts your workflow.
- *
- * PATTERN:
- * 1. Import registerTelegramTrigger and your workflow
- * 2. Call registerTelegramTrigger with a triggerType and handler
- * 3. Spread the result into the apiRoutes array in src/mastra/index.ts
- *
- * USAGE in src/mastra/index.ts:
- *
- * ```typescript
- * import { registerTelegramTrigger } from "../triggers/telegramTriggers";
- * import { telegramBotWorkflow } from "./workflows/telegramBotWorkflow";
- *
- * // In the apiRoutes array:
- * ...registerTelegramTrigger({
- *   triggerType: "telegram/message",
- *   handler: async (mastra, triggerInfo) => {
- *     const run = await telegramBotWorkflow.createRunAsync();
- *     return await run.start({ inputData: {} });
- *   }
- * })
- * ```
+ * Telegram Trigger - Webhook-based Workflow Triggering with Payment Support
  */
-
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { registerApiRoute } from "../mastra/inngest";
 import { Mastra } from "@mastra/core";
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.warn(
-    "Trying to initialize Telegram triggers without TELEGRAM_BOT_TOKEN. Can you confirm that the Telegram integration is configured correctly?",
+    "TELEGRAM_BOT_TOKEN not found. Please configure the Telegram integration.",
   );
 }
 
 export type TriggerInfoTelegramOnNewMessage = {
-  type: "telegram/message";
+  type: "telegram/message" | "telegram/pre_checkout" | "telegram/payment";
   params: {
     userName: string;
     message: string;
@@ -46,14 +20,57 @@ export type TriggerInfoTelegramOnNewMessage = {
   payload: any;
 };
 
+async function answerPreCheckoutQuery(preCheckoutQueryId: string, ok: boolean, errorMessage?: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  await fetch(`https://api.telegram.org/bot${token}/answerPreCheckoutQuery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      pre_checkout_query_id: preCheckoutQueryId,
+      ok,
+      error_message: errorMessage,
+    }),
+  });
+}
+
+async function sendInvoice(chatId: number, quantity: number) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const starsAmount = quantity * 10;
+  
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendInvoice`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      title: `🥚 ${quantity} Киндер-яиц`,
+      description: `Купить ${quantity} яиц для игры в Киндер-сюрприз. Открывай яйца и собирай фигурки Stranger Things!`,
+      payload: JSON.stringify({ quantity, chatId }),
+      provider_token: "",
+      currency: "XTR",
+      prices: [{ label: `${quantity} яиц`, amount: starsAmount }],
+    }),
+  });
+  
+  return response.json();
+}
+
 export function registerTelegramTrigger({
   triggerType,
   handler,
+  paymentHandler,
 }: {
   triggerType: string;
   handler: (
     mastra: Mastra,
     triggerInfo: TriggerInfoTelegramOnNewMessage,
+  ) => Promise<void>;
+  paymentHandler?: (
+    mastra: Mastra,
+    telegramId: number,
+    userName: string,
+    starsAmount: number,
+    paymentChargeId: string,
+    chatId: number,
   ) => Promise<void>;
 }) {
   return [
@@ -64,17 +81,64 @@ export function registerTelegramTrigger({
         const logger = mastra.getLogger();
         try {
           const payload = await c.req.json();
-
           logger?.info("📝 [Telegram] payload", payload);
 
-          await handler(mastra, {
-            type: triggerType,
-            params: {
-              userName: payload.message.from.username,
-              message: payload.message.text,
-            },
-            payload,
-          } as TriggerInfoTelegramOnNewMessage);
+          if (payload.pre_checkout_query) {
+            logger?.info("💳 [Telegram] Pre-checkout query received");
+            const preCheckout = payload.pre_checkout_query;
+            
+            if (preCheckout.currency === "XTR") {
+              await answerPreCheckoutQuery(preCheckout.id, true);
+              logger?.info("✅ [Telegram] Pre-checkout approved");
+            } else {
+              await answerPreCheckoutQuery(preCheckout.id, false, "Invalid currency");
+              logger?.error("❌ [Telegram] Pre-checkout rejected - invalid currency");
+            }
+            return c.text("OK", 200);
+          }
+
+          if (payload.message?.successful_payment) {
+            logger?.info("💰 [Telegram] Successful payment received");
+            const payment = payload.message.successful_payment;
+            const chatId = payload.message.chat.id;
+            const userName = payload.message.from.username || `user_${payload.message.from.id}`;
+            const telegramId = payload.message.from.id;
+            
+            if (paymentHandler) {
+              await paymentHandler(
+                mastra,
+                telegramId,
+                userName,
+                payment.total_amount,
+                payment.telegram_payment_charge_id,
+                chatId,
+              );
+            }
+            return c.text("OK", 200);
+          }
+
+          if (payload.message?.text) {
+            const text = payload.message.text.toLowerCase();
+            const chatId = payload.message.chat.id;
+            
+            if (text.includes("купить") || text.includes("buy")) {
+              const quantityMatch = text.match(/(\d+)/);
+              const quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+              
+              logger?.info("🛒 [Telegram] Purchase request, sending invoice", { quantity });
+              await sendInvoice(chatId, quantity);
+              return c.text("OK", 200);
+            }
+            
+            await handler(mastra, {
+              type: triggerType as any,
+              params: {
+                userName: payload.message.from.username || `user_${payload.message.from.id}`,
+                message: payload.message.text,
+              },
+              payload,
+            });
+          }
 
           return c.text("OK", 200);
         } catch (error) {

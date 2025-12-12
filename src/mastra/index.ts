@@ -127,9 +127,32 @@ export const mastra = new Mastra({
           await run.start({
             inputData: {
               userName: triggerInfo.params.userName || "unknown",
+              telegramId: triggerInfo.payload.message.from.id,
               message: triggerInfo.params.message,
               chatId: triggerInfo.payload.message.chat.id,
             },
+          });
+        },
+        paymentHandler: async (mastra, telegramId, userName, starsAmount, paymentChargeId, chatId) => {
+          const logger = mastra.getLogger();
+          logger?.info("💰 [Payment Handler] Processing payment:", { telegramId, userName, starsAmount, paymentChargeId });
+          
+          const { processPaymentTool } = await import("./tools/eggCollectionTool");
+          const result = await processPaymentTool.execute({
+            context: { telegramId: Number(telegramId), userName, starsAmount, paymentChargeId },
+            mastra,
+            runtimeContext: {} as any,
+          });
+          
+          const token = process.env.TELEGRAM_BOT_TOKEN;
+          await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: result.message,
+              parse_mode: "Markdown",
+            }),
           });
         },
       }),

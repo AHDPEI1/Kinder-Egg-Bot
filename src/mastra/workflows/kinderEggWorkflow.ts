@@ -8,6 +8,7 @@ const processWithAgent = createStep({
 
   inputSchema: z.object({
     userName: z.string().describe("Telegram username"),
+    telegramId: z.number().describe("Telegram user ID"),
     message: z.string().describe("User message"),
     chatId: z.number().describe("Telegram chat ID"),
   }),
@@ -21,14 +22,15 @@ const processWithAgent = createStep({
     const logger = mastra?.getLogger();
     logger?.info("🚀 [Step 1] Processing message with agent...", {
       userName: inputData.userName,
+      telegramId: inputData.telegramId,
       message: inputData.message,
     });
 
     const response = await kinderEggAgent.generateLegacy(
-      [{ role: "user", content: `Пользователь: ${inputData.userName}\nСообщение: ${inputData.message}` }],
+      [{ role: "user", content: `telegramId: ${inputData.telegramId}\nuserName: ${inputData.userName}\nСообщение: ${inputData.message}` }],
       {
-        resourceId: inputData.userName,
-        threadId: `telegram-${inputData.userName}`,
+        resourceId: String(inputData.telegramId),
+        threadId: `telegram-${inputData.telegramId}`,
         maxSteps: 5,
       }
     );
@@ -110,7 +112,7 @@ const sendToTelegram = createStep({
         
         if (!photoResult.ok) {
           logger?.warn("⚠️ [Step 2] Photo send failed, falling back to text:", photoResult);
-          const textResponse = await fetch(
+          await fetch(
             `https://api.telegram.org/bot${token}/sendMessage`,
             {
               method: "POST",
@@ -122,16 +124,8 @@ const sendToTelegram = createStep({
               }),
             }
           );
-          const textResult = await textResponse.json();
-          if (!textResult.ok) {
-            return {
-              success: false,
-              message: `Telegram error: ${textResult.description}`,
-            };
-          }
         }
         
-        logger?.info("✅ [Step 2] Photo sent to Telegram successfully");
         return {
           success: true,
           message: "Photo sent successfully",
@@ -155,7 +149,7 @@ const sendToTelegram = createStep({
       
       if (!result.ok) {
         logger?.error("❌ [Step 2] Telegram API error:", result);
-        const retryResponse = await fetch(
+        await fetch(
           `https://api.telegram.org/bot${token}/sendMessage`,
           {
             method: "POST",
@@ -166,14 +160,6 @@ const sendToTelegram = createStep({
             }),
           }
         );
-        const retryResult = await retryResponse.json();
-        
-        if (!retryResult.ok) {
-          return {
-            success: false,
-            message: `Telegram error: ${retryResult.description}`,
-          };
-        }
       }
 
       logger?.info("✅ [Step 2] Message sent to Telegram successfully");
@@ -197,6 +183,7 @@ export const kinderEggWorkflow = createWorkflow({
 
   inputSchema: z.object({
     userName: z.string().describe("Telegram username"),
+    telegramId: z.number().describe("Telegram user ID"),
     message: z.string().describe("User message"),
     chatId: z.number().describe("Telegram chat ID"),
   }) as any,
