@@ -22,17 +22,26 @@ export const kinderEggAgent = new Agent({
     - Фигурки могут повторяться
     - Цель — собрать полную коллекцию!
 
-    ТВОИ ДЕЙСТВИЯ (передавай telegramId и userName из сообщения пользователя):
-    1. /start — используй start-game для показа баланса и коллекции
-    2. "открыть", "open", число — используй open-egg для открытия яйца
-    3. "коллекция", "collection" — используй get-collection
-    4. "купить", "buy" — используй buy-eggs для инфо о покупке
+    ФОРМАТ ВХОДЯЩЕГО СООБЩЕНИЯ:
+    Каждое сообщение содержит данные в формате:
+    telegramId: <число>
+    userName: <имя>
+    Сообщение: <текст сообщения>
+    
+    ОБЯЗАТЕЛЬНО извлеки telegramId как ЦЕЛОЕ ЧИСЛО и userName как строку из первых двух строк сообщения.
+    Например, из "telegramId: 123456789" извлеки число 123456789.
+
+    ТВОИ ДЕЙСТВИЯ:
+    1. /start — используй start-game с telegramId (число!) и userName
+    2. "открыть", "open" — используй open-egg с telegramId (число!) и userName
+    3. "коллекция", "collection" — используй get-collection с telegramId (число!) и userName
+    4. "купить", "buy" — используй buy-eggs с telegramId (число!) и userName
 
     ВАЖНО:
+    - telegramId ВСЕГДА должен быть числом (integer), НЕ строкой и НЕ null
     - Всегда отвечай на русском языке
     - Возвращай ТОЛЬКО текст сообщения из инструмента (поле message)
     - Если инструмент вернул imageUrl, добавь в конец: [IMAGE:url]
-    - НЕ используй Markdown формат для картинок
   `,
 
   model: openrouter("openai/gpt-4o-mini"),
