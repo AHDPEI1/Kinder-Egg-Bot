@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Запуск программы",
+            "type": "python"
+            "request": "launch",
+            "program": "${workspaceFolder}/app.js",
+            "args": [],
+            "stopOnEntry": false
+        }
+    ]
+}
